@@ -28,6 +28,8 @@ module MarkdownBuilder exposing
     , pushEmphasis
     , pushStrongEmphasis
     , pushStrikethrough
+    , applySnippet
+    , Unknown
     )
 
 {-| This library helps your library or application to generate valid markdown document programmatically.
@@ -87,6 +89,12 @@ module MarkdownBuilder exposing
 @docs pushEmphasis
 @docs pushStrongEmphasis
 @docs pushStrikethrough
+
+
+## Unknown
+
+@docs applySnippet
+@docs Unknown
 
 -}
 
@@ -1103,3 +1111,74 @@ previewInline inline =
 
         Strikethrough text ->
             Html.del [] [ Html.text text ]
+
+
+{-| -}
+type Unknown
+    = Unknown
+
+
+{-|
+
+    import MarkdownBuilder as MB
+
+    snippet : Builder Unknown ListItem -> Builder Unknown ListItem
+    snippet =
+        MB.editListItemContent
+            >> MB.pushText "foo "
+            >> MB.pushEmphasis "bar"
+            >> MB.endPushMode
+
+    myMarkdown : Root
+    myMarkdown =
+        root
+            { title = "Markdown Builder"
+            }
+            |> editBody
+            |> appendOrderedList
+            |> appendListItem
+            |> applySnippet snippet
+            |> break
+            |> appendListItem
+            |> applySnippet snippet
+            |> break
+            |> break
+            |> endAppendMode
+            |> appendChildSection
+                { title = "Builder"
+                }
+            |> editBody
+            |> appendUnorderedList
+            |> appendListItem
+            |> applySnippet snippet
+            |> run
+
+    toString myMarkdown
+        |> String.lines
+    --> [ "# Markdown Builder"
+    --> , ""
+    --> , "1. foo *bar*"
+    --> , "1. foo *bar*"
+    --> , ""
+    --> , "## Builder"
+    --> , ""
+    --> , "* foo *bar*"
+    --> ]
+
+-}
+applySnippet : (Builder Unknown a -> Builder Unknown a) -> Builder any a -> Builder any a
+applySnippet modifier (Builder builder) =
+    let
+        (Builder modified) =
+            Builder
+                { current = builder.current
+                , parent = \_ -> Unknown
+                , root = \Unknown -> Root <| initSection ""
+                }
+                |> modifier
+    in
+    Builder
+        { current = modified.current
+        , parent = builder.parent
+        , root = builder.root
+        }
