@@ -2,6 +2,7 @@ module MarkdownBuilderSuite exposing (myMarkdown, suite)
 
 import Expect
 import MarkdownBuilder as MB
+import MarkdownAst as Ast
 import Test exposing (..)
 
 
@@ -10,68 +11,78 @@ suite =
     test "render sample markdown as expected." <|
         \_ ->
             myMarkdown
-                |> MB.toString
-                |> Expect.equal """Markdown Builder
+                |> Ast.render
+                |> Expect.equal """# Markdown Builder
 
 Markdown Builder builds *Markdown* programmatically.
 
-## Builder
+## Section
 
 * List Item 1
     1. Child item
 * List Item 2
 
-    Child paragraph.
+    Child paragraph. \\[Link like\\]\\(./src\\) in plain text. 1. foo  
+    2\\. bar
+
+    1\\. dummy ordered list item
 
     ```elm
     type Builder parent elem =
         ...
         ...
     ```
-* List Item 3"""
+* List Item 3
+
+    > [Child paragraph](./bar "title here").
+    >
+    > ```elm
+    > type Builder parent elem =
+    >     ...
+    >     ...
+    > ```
+
+    ![dummy image](./foo)
+* List Item 4"""
 
 
-myMarkdown : MB.Root
+myMarkdown : Ast.Section
 myMarkdown =
     MB.root
         { title = "Markdown Builder"
         }
         |> MB.editBody
         |> MB.appendParagraph
-        |> MB.pushText
-            "Markdown Builder builds"
-        |> MB.pushEmphasis
-            "Markdown"
-        |> MB.pushText
-            "programmatically."
-        |> MB.break
+            [ Ast.PlainText "Markdown Builder builds "
+            , Ast.Emphasis "Markdown"
+            , Ast.PlainText " programmatically."
+            ]
         |> MB.endAppendMode
         |> MB.appendChildSection
-            { title = "Builder"
+            { title = "Section"
             }
         |> MB.editBody
         |> MB.appendUnorderedList
         |> MB.appendListItem
-        |> MB.editListItemContent
-        |> MB.pushText "List Item 1"
-        |> MB.endPushMode
-        |> MB.editListItemChildren
+            [ Ast.PlainText "List Item 1"
+            ]
         |> MB.appendOrderedList
         |> MB.appendListItem
-        |> MB.editListItemContent
-        |> MB.pushText "Child item"
-        |> MB.break
-        |> MB.break
+            [ Ast.PlainText "Child item"
+            ]
         |> MB.break
         |> MB.appendListItem
-        |> MB.editListItemContent
-        |> MB.pushText "List Item 2"
-        |> MB.endPushMode
-        |> MB.editListItemChildren
+            [ Ast.PlainText "List Item 2"
+            ]
         |> MB.appendParagraph
-        |> MB.pushText
-            "Child paragraph."
-        |> MB.break
+            [ Ast.PlainText "Child paragraph."
+            , Ast.PlainText " [Link like](./src) in plain text.\n1. foo"
+            , Ast.LineBreak
+            , Ast.PlainText "2. bar"
+            ]
+        |> MB.appendParagraph
+            [ Ast.PlainText "1. dummy ordered list item"
+            ]
         |> MB.appendCodeBlock
             """elm
             type Builder parent elem =
@@ -80,6 +91,33 @@ myMarkdown =
             """
         |> MB.break
         |> MB.appendListItem
-        |> MB.editListItemContent
-        |> MB.pushText "List Item 3"
+            [ Ast.PlainText "List Item 3"
+            ]
+        |> MB.appendQuoteBlock
+        |> MB.appendParagraph
+            [ Ast.Link
+              { text = "\tChild paragraph\n\n"
+              , href = "./bar"
+              , title = Just "\n  title   \there "
+              }
+            , Ast.PlainText "."
+            ]
+        |> MB.appendCodeBlock
+            """elm
+            type Builder parent elem =
+                ...
+                ...
+            """
+        |> MB.break
+        |> MB.appendParagraph
+            [ Ast.Image
+              { src = "./foo"
+              , alt = "  dummy  image\n"
+              , title = Nothing
+              }
+            ]
+        |> MB.break
+        |> MB.appendListItem
+            [ Ast.PlainText "List Item 4"
+            ]
         |> MB.run

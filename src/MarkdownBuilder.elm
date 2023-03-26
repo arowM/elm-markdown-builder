@@ -4,32 +4,19 @@ module MarkdownBuilder exposing
     , Root
     , root
     , run
-    , toString
-    , preview
     , Section
     , editBody
     , appendChildSection
     , ListBlock, ListItem
     , appendListItem
-    , editListItemContent
-    , editListItemChildren
     , AppendMode
     , endAppendMode
     , appendParagraph
-    , Paragraph
+    , appendQuoteBlock
+    , QuoteBlock
     , appendOrderedList
     , appendUnorderedList
     , appendCodeBlock
-    , PushMode
-    , endPushMode
-    , pushText
-    , pushLink
-    , pushCode
-    , pushEmphasis
-    , pushStrongEmphasis
-    , pushStrikethrough
-    , applySnippet
-    , Unknown
     )
 
 {-| This library helps your library or application to generate valid markdown document programmatically.
@@ -46,8 +33,6 @@ module MarkdownBuilder exposing
 @docs Root
 @docs root
 @docs run
-@docs toString
-@docs preview
 
 
 # Section
@@ -61,8 +46,6 @@ module MarkdownBuilder exposing
 
 @docs ListBlock, ListItem
 @docs appendListItem
-@docs editListItemContent
-@docs editListItemChildren
 
 
 # General Modifiers
@@ -73,79 +56,15 @@ module MarkdownBuilder exposing
 @docs AppendMode
 @docs endAppendMode
 @docs appendParagraph
-@docs Paragraph
+@docs appendQuoteBlock
+@docs QuoteBlock
 @docs appendOrderedList
 @docs appendUnorderedList
 @docs appendCodeBlock
 
-
-## Push Mode
-
-@docs PushMode
-@docs endPushMode
-@docs pushText
-@docs pushLink
-@docs pushCode
-@docs pushEmphasis
-@docs pushStrongEmphasis
-@docs pushStrikethrough
-
-
-## Unknown
-
-@docs applySnippet
-@docs Unknown
-
 -}
 
-import Html exposing (Html)
-import Html.Attributes as Attributes
-import Internal exposing (headTicks, inlineTicks, trimIndent)
-import Url
-
-
-
--- Internal
-
-
-{-| -}
-type BlockElement
-    = ParagraphBlock Paragraph
-    | ListBlock ListBlock
-    | CodeBlock String
-
-
-
--- | QuoteBlock
--- | ImageBlock
-
-
-{-| -}
-type Paragraph
-    = Paragraph (List InlineElement) -- reversed
-
-
-initParagraph : PushMode Paragraph
-initParagraph =
-    PushMode
-        { push =
-            \elem (Paragraph elems) ->
-                Paragraph (elem :: elems)
-        , value = Paragraph []
-        }
-
-
-{-| -}
-type InlineElement
-    = PlainText String
-    | Link
-        { href : String
-        , text : String
-        }
-    | InlineCode String
-    | Emphasis String
-    | StrongEmphasis String
-    | Strikethrough String
+import MarkdownAst as Ast
 
 
 
@@ -155,20 +74,19 @@ type InlineElement
 {-| Markdown builder.
 You can build a valid markdown structure programmatically in your program:
 
-    myMarkdown : Root
+    import MarkdownAst as Ast
+
+    myMarkdown : Ast.Section
     myMarkdown =
         root
             { title = "Markdown Builder"
             }
             |> editBody
             |> appendParagraph
-            |> pushText
-                "Markdown Builder builds"
-            |> pushEmphasis
-                "Markdown"
-            |> pushText
-                "programmatically."
-            |> break
+                [ Ast.PlainText "Markdown Builder builds "
+                , Ast.Emphasis "Markdown"
+                , Ast.PlainText " programmatically."
+                ]
             |> endAppendMode
             |> appendChildSection
                 { title = "Builder"
@@ -176,26 +94,21 @@ You can build a valid markdown structure programmatically in your program:
             |> editBody
             |> appendUnorderedList
             |> appendListItem
-            |> editListItemContent
-            |> pushText "List Item 1"
-            |> endPushMode
-            |> editListItemChildren
+                [ Ast.PlainText "List Item 1"
+                ]
             |> appendOrderedList
             |> appendListItem
-            |> editListItemContent
-            |> pushText "Child item"
+                [ Ast.PlainText "Child item"
+                ]
             |> break
             |> break
             |> break
             |> appendListItem
-            |> editListItemContent
-            |> pushText "List Item 2"
-            |> endPushMode
-            |> editListItemChildren
+                [ Ast.PlainText "List Item 2"
+                ]
             |> appendParagraph
-            |> pushText
-                "Child paragraph."
-            |> break
+                [ Ast.PlainText "Child paragraph."
+                ]
             |> appendCodeBlock
                 """elm
                 type Builder parent elem =
@@ -204,11 +117,11 @@ You can build a valid markdown structure programmatically in your program:
                 """
             |> break
             |> appendListItem
-            |> editListItemContent
-            |> pushText "List Item 3"
+                [ Ast.PlainText "List Item 3"
+                ]
             |> run
 
-    toString myMarkdown
+    Ast.render myMarkdown
         |> String.lines
     --> [ "# Markdown Builder"
     --> , ""
@@ -270,55 +183,40 @@ root { title } =
 
 {-| Quit modifying markdown, and compile it to the valid markdown structure.
 -}
-run : Builder parent a -> Root
+run : Builder parent a -> Ast.Section
 run (Builder builder) =
     builder.current
         |> builder.parent
         |> builder.root
+        |> (\(Root section) -> runSection section)
+
+
+runSection : Section -> Ast.Section
+runSection (Section section) =
+    Ast.Section
+        { title = section.title
+        , body = List.reverse section.body
+        , children =
+            List.reverse section.children
+                |> List.map runSection
+        }
 
 
 
 -- Section
 
 
-{-| Represents markdown section.
-
-    # Title for Root Section
-
-    Paragraph text in root section body.
-
-    Another paragraph text in root section body.
-
-    * List item in root section body
-    * Another list item in root section body
-
-    ## Title for Child Section
-
-    Paragraph text in child section body.
-
-    ```json
-    {
-      "message": "Code block in child section body."
-    }
-    ```
-
-    ## Title for Another Child Section
-
-    Paragraph text in another child section body.
-
-    1. Ordered list item in another child section body
-    1. Another ordered list item in another child section body
-
+{-| Builder for section.
 -}
 type Section
     = Section
         { title : String
-        , body : List BlockElement -- reversed
+        , body : List Ast.BlockElement -- reversed
         , children : List Section -- reversed
         }
 
 
-appendSectionBody : BlockElement -> Section -> Section
+appendSectionBody : Ast.BlockElement -> Section -> Section
 appendSectionBody elem (Section sec) =
     Section
         { sec
@@ -379,7 +277,7 @@ appendChildSection { title } builder =
 -- List Block
 
 
-{-| Represents markdown list block.
+{-| Builder for a list block.
 -}
 type ListBlock
     = ListBlock_
@@ -388,35 +286,26 @@ type ListBlock
         }
 
 
-{-| Represents an item in the `ListBlock`.
-
-```markdown
-* First `ListItem` content for this unordered `ListBlock`
-    Child element for the first `ListItem`.
-
-    1. This `ListItem` is in the child `ListBlock` for the First `ListItem` content.
-    1. This `ListItem` is also in the child `ListBlock` for the First `ListItem` content.
-
-* Second `ListItem` content for this unordered `ListBlock`
-```
-
+{-| Builder for items in a list block.
 -}
 type ListItem
     = ListItem
-        { content : List InlineElement -- reversed
-        , children : List BlockElement -- reversed
+        { content : List Ast.InlineElement
+        , children : List Ast.BlockElement -- reversed
         }
 
 
-{-| -}
+{-| Append a list item, and change focus to it.
+-}
 appendListItem :
-    Builder p ListBlock
-    -> Builder (Builder p ListBlock) ListItem
-appendListItem builder =
+    List Ast.InlineElement
+    -> Builder p ListBlock
+    -> Builder (Builder p ListBlock) (AppendMode ListItem)
+appendListItem content builder =
     Builder
         { current =
             ListItem
-                { content = []
+                { content = content
                 , children = []
                 }
         , parent =
@@ -431,30 +320,7 @@ appendListItem builder =
                     builder
         , root = childRoot builder
         }
-
-
-{-| Start [Push Mode](#push-mode) for editing list item content.
--}
-editListItemContent :
-    Builder parent ListItem
-    -> Builder parent (PushMode ListItem)
-editListItemContent (Builder builder) =
-    Builder
-        { current =
-            PushMode
-                { push =
-                    \elem (ListItem item) ->
-                        ListItem
-                            { item
-                                | content = elem :: item.content
-                            }
-                , value = builder.current
-                }
-        , parent =
-            \(PushMode inline) ->
-                builder.parent inline.value
-        , root = builder.root
-        }
+        |> editListItemChildren
 
 
 {-| Start [Append Mode](#append-mode) for editing list item children.
@@ -476,7 +342,7 @@ editListItemChildren (Builder builder) =
         }
 
 
-appendListItemChild : BlockElement -> ListItem -> ListItem
+appendListItemChild : Ast.BlockElement -> ListItem -> ListItem
 appendListItemChild elem (ListItem item) =
     ListItem
         { item | children = elem :: item.children }
@@ -491,12 +357,12 @@ appendListItemChild elem (ListItem item) =
 -}
 type AppendMode a
     = AppendMode
-        { appendBlock : BlockElement -> a -> a
+        { appendBlock : Ast.BlockElement -> a -> a
         , value : a
         }
 
 
-append : BlockElement -> AppendMode a -> AppendMode a
+append : Ast.BlockElement -> AppendMode a -> AppendMode a
 append block (AppendMode appendable) =
     AppendMode
         { appendable
@@ -523,21 +389,16 @@ endAppendMode (Builder builder) =
         }
 
 
-{-| Append a paragraph block, and change to push mode for the paragraph.
+{-| Append a paragraph block.
 -}
 appendParagraph :
-    Builder parent (AppendMode a)
-    -> Builder (Builder parent (AppendMode a)) (PushMode Paragraph)
-appendParagraph builder =
-    Builder
-        { current = initParagraph
-        , parent =
-            \(PushMode inline) ->
-                modify
-                    (append (ParagraphBlock inline.value))
-                    builder
-        , root = childRoot builder
-        }
+    List Ast.InlineElement
+    -> Builder parent (AppendMode a)
+    -> Builder parent (AppendMode a)
+appendParagraph content builder =
+    modify
+        (append (Ast.ParagraphBlock content))
+        builder
 
 
 {-| Append an ordered list block, and change focus to it.
@@ -553,9 +414,22 @@ appendOrderedList builder =
                 , items = []
                 }
         , parent =
-            \list ->
+            \(ListBlock_ context) ->
                 modify
-                    (append (ListBlock list))
+                    (append
+                        (Ast.ListBlock
+                            { ordered = context.ordered
+                            , items =
+                                List.reverse context.items
+                                    |> List.map
+                                        (\(ListItem item) ->
+                                            { content = List.reverse item.content
+                                            , children = List.reverse item.children
+                                            }
+                                        )
+                            }
+                        )
+                    )
                     builder
         , root = childRoot builder
         }
@@ -574,15 +448,28 @@ appendUnorderedList builder =
                 , items = []
                 }
         , parent =
-            \list ->
+            \(ListBlock_ context) ->
                 modify
-                    (append (ListBlock list))
+                    (append
+                        (Ast.ListBlock
+                            { ordered = context.ordered
+                            , items =
+                                List.reverse context.items
+                                    |> List.map
+                                        (\(ListItem item) ->
+                                            { content = List.reverse item.content
+                                            , children = List.reverse item.children
+                                            }
+                                        )
+                            }
+                        )
+                    )
                     builder
         , root = childRoot builder
         }
 
 
-{-| Append a code block, and change focus to it.
+{-| Append a code block.
 
 Elm code:
 
@@ -606,7 +493,50 @@ appendCodeBlock :
     -> Builder parent (AppendMode a)
 appendCodeBlock r =
     modify
-        (append (CodeBlock r))
+        (append (Ast.CodeBlock r))
+
+
+{-| Append a quote block, and focus it.
+-}
+appendQuoteBlock :
+    Builder parent (AppendMode a)
+    -> Builder (Builder parent (AppendMode a)) (AppendMode QuoteBlock)
+appendQuoteBlock builder =
+    Builder
+        { current =
+            AppendMode
+                { appendBlock =
+                    \elem (QuoteBlock context) ->
+                        QuoteBlock
+                            { context
+                                | content = elem :: context.content
+                            }
+                , value =
+                    QuoteBlock
+                        { content = []
+                        }
+                }
+        , parent =
+            \(AppendMode appendable) ->
+                (\(QuoteBlock block) ->
+                    modify
+                        (append
+                            (Ast.QuoteBlock
+                                (List.reverse block.content)
+                            )
+                        )
+                        builder
+                )
+                    appendable.value
+        , root = childRoot builder
+        }
+
+
+{-| -}
+type QuoteBlock
+    = QuoteBlock
+        { content : List Ast.BlockElement --reversed
+        }
 
 
 childRoot : Builder p b -> Builder p b -> Root
@@ -619,566 +549,4 @@ modify f (Builder builder) =
     Builder
         { builder
             | current = f builder.current
-        }
-
-
-
--- -- Push Mode
-
-
-{-| Represents that `a` is in the _Push Mode_, which enables you to push some inline stuffs to it.
--}
-type PushMode a
-    = PushMode
-        { push : InlineElement -> a -> a
-        , value : a
-        }
-
-
-{-| End push mode.
--}
-endPushMode : Builder p (PushMode a) -> Builder p a
-endPushMode (Builder builder) =
-    let
-        (PushMode inline) =
-            builder.current
-    in
-    Builder
-        { current = inline.value
-        , parent =
-            \value ->
-                builder.parent
-                    (PushMode { inline | value = value })
-        , root = builder.root
-        }
-
-
-push : InlineElement -> PushMode a -> PushMode a
-push elem (PushMode inline) =
-    PushMode
-        { inline
-            | value =
-                inline.push elem inline.value
-        }
-
-
-{-| Push a plain text.
--}
-pushText : String -> Builder parent (PushMode a) -> Builder parent (PushMode a)
-pushText str =
-    modify <| push (PlainText str)
-
-
-{-| Push a link.
-
-```markdown
-[href](text)
-```
-
--}
-pushLink :
-    { href : String
-    , text : String
-    }
-    -> Builder parent (PushMode a)
-    -> Builder parent (PushMode a)
-pushLink r =
-    modify <| push (Link r)
-
-
-{-| Push an inline code.
-
-```markdown
-`inline code`
-```
-
--}
-pushCode :
-    String
-    -> Builder parent (PushMode a)
-    -> Builder parent (PushMode a)
-pushCode str =
-    modify <| push (InlineCode str)
-
-
-{-| Push an emphasized text.
-
-```markdown
-*emphasized*
-```
-
--}
-pushEmphasis :
-    String
-    -> Builder parent (PushMode a)
-    -> Builder parent (PushMode a)
-pushEmphasis str =
-    modify <| push (Emphasis str)
-
-
-{-| Push a strongly emphasized text.
-
-```markdown
-**emphasized**
-```
-
--}
-pushStrongEmphasis :
-    String
-    -> Builder parent (PushMode a)
-    -> Builder parent (PushMode a)
-pushStrongEmphasis str =
-    modify <| push (StrongEmphasis str)
-
-
-{-| Push a strikethrough text.
-
-```markdown
-~~strikethrough~~
-```
-
--}
-pushStrikethrough :
-    String
-    -> Builder parent (PushMode a)
-    -> Builder parent (PushMode a)
-pushStrikethrough str =
-    modify <| push (Strikethrough str)
-
-
-
--- Render to String
-
-
-{-| Render `Root` into markdown text string.
--}
-toString : Root -> String
-toString (Root sec) =
-    sectionToString
-        { headerLevel = 1
-        }
-        sec
-
-
-sectionToString : SectionStringContext -> Section -> String
-sectionToString context (Section sec) =
-    let
-        childContext =
-            { context | headerLevel = context.headerLevel + 1 }
-    in
-    List.concat
-        [ [ String.join " "
-                [ String.repeat context.headerLevel "#"
-                , String.trim sec.title
-                ]
-          ]
-        , List.reverse sec.body
-            |> List.map
-                (blockToString
-                    { indentLevel = 0
-                    }
-                )
-        , List.reverse sec.children
-            |> List.map
-                (sectionToString childContext)
-        ]
-        |> String.join "\n\n"
-
-
-type alias SectionStringContext =
-    { headerLevel : Int
-    }
-
-
-blockToString : BlockStringContext -> BlockElement -> String
-blockToString context block =
-    let
-        setIndent : String -> String
-        setIndent str =
-            String.concat
-                [ String.repeat context.indentLevel "    "
-                , str
-                ]
-    in
-    case block of
-        ParagraphBlock (Paragraph ps) ->
-            List.reverse ps
-                |> List.map inlineToString
-                |> String.join " "
-                |> setIndent
-
-        ListBlock (ListBlock_ param) ->
-            List.reverse param.items
-                |> List.map
-                    (listItemToString param.ordered context)
-                |> String.join "\n"
-
-        CodeBlock param ->
-            let
-                ( header, codeLines ) =
-                    case String.lines param of
-                        [] ->
-                            ( "", [] )
-
-                        h :: bs ->
-                            ( String.trim h
-                            , trimIndent bs
-                                |> List.take (List.length bs - 1)
-                            )
-
-                backslashes : Int
-                backslashes =
-                    List.map headTicks codeLines
-                        |> List.maximum
-                        |> Maybe.map
-                            (\n -> n + 1)
-                        |> Maybe.withDefault 3
-                        |> max 3
-            in
-            String.join "\n"
-                [ String.concat
-                    [ String.repeat backslashes "`"
-                    , String.trim header
-                    ]
-                    |> setIndent
-                , List.map setIndent codeLines
-                    |> String.join "\n"
-                , String.repeat backslashes "`"
-                    |> setIndent
-                ]
-
-
-type alias BlockStringContext =
-    { indentLevel : Int
-    }
-
-
-listItemToString : Bool -> BlockStringContext -> ListItem -> String
-listItemToString ordered context (ListItem item) =
-    let
-        symbol =
-            if ordered then
-                "1."
-
-            else
-                "*"
-
-        setIndent : String -> String
-        setIndent str =
-            String.concat
-                [ String.repeat context.indentLevel "    "
-                , str
-                ]
-
-        children =
-            List.reverse item.children
-
-        hasBlankLine =
-            case children of
-                [] ->
-                    False
-
-                (ListBlock _) :: _ ->
-                    False
-
-                _ ->
-                    True
-    in
-    List.concat
-        [ [ String.join " "
-                [ symbol
-                , List.reverse item.content
-                    |> List.map inlineToString
-                    |> String.join " "
-                ]
-                |> setIndent
-          ]
-        , if hasBlankLine then
-            [ "" ]
-
-          else
-            []
-        , children
-            |> List.map
-                (blockToString
-                    { context | indentLevel = context.indentLevel + 1 }
-                )
-            |> List.intersperse ""
-        ]
-        |> String.join "\n"
-
-
-inlineToString : InlineElement -> String
-inlineToString inline =
-    case inline of
-        PlainText text ->
-            String.trim text
-                |> String.lines
-                |> String.join " "
-
-        Link param ->
-            String.concat
-                [ "["
-                , String.trim param.text
-                    |> String.lines
-                    |> String.join " "
-                , "]("
-                , param.href
-                , ")"
-                ]
-
-        InlineCode code ->
-            let
-                backslashes =
-                    inlineTicks code + 1
-            in
-            String.concat
-                [ String.repeat backslashes "`"
-                , code
-                , String.repeat backslashes "`"
-                ]
-
-        Emphasis str ->
-            String.concat
-                [ "*"
-                , String.trim str
-                    |> String.lines
-                    |> String.join " "
-                , "*"
-                ]
-
-        StrongEmphasis str ->
-            String.concat
-                [ "**"
-                , String.trim str
-                    |> String.lines
-                    |> String.join " "
-                , "**"
-                ]
-
-        Strikethrough str ->
-            String.concat
-                [ "~~"
-                , String.trim str
-                    |> String.lines
-                    |> String.join " "
-                , "~~"
-                ]
-
-
-
--- Preview
-
-
-{-| Preview markdown content as an HTML page.
--}
-preview : Root -> Html msg
-preview (Root sec) =
-    previewSection
-        { headerLevel = 1
-        }
-        sec
-
-
-previewSection : SectionPreviewContext -> Section -> Html msg
-previewSection context (Section sec) =
-    List.concat
-        [ [ previewHeader context.headerLevel sec.title
-          ]
-        , List.reverse sec.body
-            |> List.map previewBlock
-        , List.reverse sec.children
-            |> List.map
-                (previewSection
-                    { context
-                        | headerLevel =
-                            context.headerLevel + 1
-                    }
-                )
-        ]
-        |> Html.div []
-
-
-type alias SectionPreviewContext =
-    { headerLevel : Int
-    }
-
-
-previewHeader : Int -> String -> Html msg
-previewHeader n str =
-    let
-        attr =
-            [ Attributes.id <| Url.percentEncode str
-            ]
-    in
-    case n of
-        1 ->
-            Html.h1 attr [ Html.text str ]
-
-        2 ->
-            Html.h2 attr [ Html.text str ]
-
-        3 ->
-            Html.h3 attr [ Html.text str ]
-
-        4 ->
-            Html.h4 attr [ Html.text str ]
-
-        5 ->
-            Html.h5 attr [ Html.text str ]
-
-        6 ->
-            Html.h6 attr [ Html.text str ]
-
-        _ ->
-            Html.div attr [ Html.text str ]
-
-
-previewBlock : BlockElement -> Html msg
-previewBlock block =
-    case block of
-        ParagraphBlock (Paragraph ps) ->
-            List.reverse ps
-                |> List.map previewInline
-                |> Html.p []
-
-        ListBlock (ListBlock_ param) ->
-            let
-                container =
-                    if param.ordered then
-                        Html.ol
-
-                    else
-                        Html.ul
-            in
-            List.reverse param.items
-                |> List.map previewListItem
-                |> container []
-
-        CodeBlock param ->
-            let
-                ( header, codeLines ) =
-                    case String.lines param of
-                        [] ->
-                            ( "", [] )
-
-                        h :: bs ->
-                            ( String.trim h
-                            , trimIndent bs
-                                |> List.take (List.length bs - 1)
-                            )
-            in
-            List.map Html.text codeLines
-                |> Html.code [ Attributes.attribute "data-code-header" header ]
-                |> List.singleton
-                |> Html.pre []
-
-
-previewListItem : ListItem -> Html msg
-previewListItem (ListItem item) =
-    List.concat
-        [ [ List.reverse item.content
-                |> List.map previewInline
-                |> Html.p []
-          ]
-        , List.reverse item.children
-            |> List.map previewBlock
-        ]
-        |> Html.li []
-
-
-previewInline : InlineElement -> Html msg
-previewInline inline =
-    case inline of
-        PlainText text ->
-            Html.text text
-
-        Link param ->
-            Html.a
-                [ Attributes.href param.href
-                ]
-                [ Html.text param.text
-                ]
-
-        InlineCode code ->
-            Html.code [] [ Html.text code ]
-
-        Emphasis text ->
-            Html.em [] [ Html.text text ]
-
-        StrongEmphasis text ->
-            Html.strong [] [ Html.text text ]
-
-        Strikethrough text ->
-            Html.del [] [ Html.text text ]
-
-
-{-| -}
-type Unknown
-    = Unknown
-
-
-{-|
-
-    import MarkdownBuilder as MB
-
-    snippet : Builder Unknown ListItem -> Builder Unknown ListItem
-    snippet =
-        MB.editListItemContent
-            >> MB.pushText "foo "
-            >> MB.pushEmphasis "bar"
-            >> MB.endPushMode
-
-    myMarkdown : Root
-    myMarkdown =
-        root
-            { title = "Markdown Builder"
-            }
-            |> editBody
-            |> appendOrderedList
-            |> appendListItem
-            |> applySnippet snippet
-            |> break
-            |> appendListItem
-            |> applySnippet snippet
-            |> break
-            |> break
-            |> endAppendMode
-            |> appendChildSection
-                { title = "Builder"
-                }
-            |> editBody
-            |> appendUnorderedList
-            |> appendListItem
-            |> applySnippet snippet
-            |> run
-
-    toString myMarkdown
-        |> String.lines
-    --> [ "# Markdown Builder"
-    --> , ""
-    --> , "1. foo *bar*"
-    --> , "1. foo *bar*"
-    --> , ""
-    --> , "## Builder"
-    --> , ""
-    --> , "* foo *bar*"
-    --> ]
-
--}
-applySnippet : (Builder Unknown a -> Builder Unknown a) -> Builder any a -> Builder any a
-applySnippet modifier (Builder builder) =
-    let
-        (Builder modified) =
-            Builder
-                { current = builder.current
-                , parent = \_ -> Unknown
-                , root = \Unknown -> Root <| initSection ""
-                }
-                |> modifier
-    in
-    Builder
-        { current = modified.current
-        , parent = builder.parent
-        , root = builder.root
         }
