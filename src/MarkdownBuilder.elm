@@ -399,7 +399,7 @@ appendParagraph :
     -> Builder parent (AppendMode a)
 appendParagraph content builder =
     modify
-        (append [Ast.ParagraphBlock content])
+        (append [ Ast.ParagraphBlock content ])
         builder
 
 
@@ -419,7 +419,7 @@ appendOrderedList builder =
             \(ListBlock_ context) ->
                 modify
                     (append
-                        [Ast.ListBlock
+                        [ Ast.ListBlock
                             { ordered = context.ordered
                             , items =
                                 List.reverse context.items
@@ -453,7 +453,7 @@ appendUnorderedList builder =
             \(ListBlock_ context) ->
                 modify
                     (append
-                        [Ast.ListBlock
+                        [ Ast.ListBlock
                             { ordered = context.ordered
                             , items =
                                 List.reverse context.items
@@ -495,7 +495,7 @@ appendCodeBlock :
     -> Builder parent (AppendMode a)
 appendCodeBlock r =
     modify
-        (append [Ast.CodeBlock r])
+        (append [ Ast.CodeBlock r ])
 
 
 {-| Append a quote block, and focus it.
@@ -523,7 +523,7 @@ appendQuoteBlock builder =
                 (\(QuoteBlock block) ->
                     modify
                         (append
-                            [Ast.QuoteBlock
+                            [ Ast.QuoteBlock
                                 (List.reverse block.content)
                             ]
                         )
@@ -553,11 +553,12 @@ modify f (Builder builder) =
             | current = f builder.current
         }
 
+
 {-| Lower level API to append `BlockElement`.
 -}
 appendBlocks :
-   List Ast.BlockElement
-   -> Builder parent (AppendMode a)
-   -> Builder parent (AppendMode a)
+    List Ast.BlockElement
+    -> Builder parent (AppendMode a)
+    -> Builder parent (AppendMode a)
 appendBlocks blocks builder =
     modify (append blocks) builder
