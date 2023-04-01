@@ -17,6 +17,7 @@ module MarkdownBuilder exposing
     , appendOrderedList
     , appendUnorderedList
     , appendCodeBlock
+    , appendBlocks
     )
 
 {-| This library helps your library or application to generate valid markdown document programmatically.
@@ -61,6 +62,7 @@ module MarkdownBuilder exposing
 @docs appendOrderedList
 @docs appendUnorderedList
 @docs appendCodeBlock
+@docs appendBlocks
 
 -}
 
@@ -216,11 +218,11 @@ type Section
         }
 
 
-appendSectionBody : Ast.BlockElement -> Section -> Section
-appendSectionBody elem (Section sec) =
+appendSectionBody : List Ast.BlockElement -> Section -> Section
+appendSectionBody elems (Section sec) =
     Section
         { sec
-            | body = elem :: sec.body
+            | body = elems ++ sec.body
         }
 
 
@@ -242,7 +244,7 @@ editBody (Builder builder) =
     Builder
         { current =
             AppendMode
-                { appendBlock = appendSectionBody
+                { appendBlocks = appendSectionBody
                 , value = builder.current
                 }
         , parent =
@@ -332,7 +334,7 @@ editListItemChildren (Builder builder) =
     Builder
         { current =
             AppendMode
-                { appendBlock = appendListItemChild
+                { appendBlocks = appendListItemChild
                 , value = builder.current
                 }
         , parent =
@@ -342,10 +344,10 @@ editListItemChildren (Builder builder) =
         }
 
 
-appendListItemChild : Ast.BlockElement -> ListItem -> ListItem
-appendListItemChild elem (ListItem item) =
+appendListItemChild : List Ast.BlockElement -> ListItem -> ListItem
+appendListItemChild elems (ListItem item) =
     ListItem
-        { item | children = elem :: item.children }
+        { item | children = elems ++ item.children }
 
 
 
@@ -357,17 +359,17 @@ appendListItemChild elem (ListItem item) =
 -}
 type AppendMode a
     = AppendMode
-        { appendBlock : Ast.BlockElement -> a -> a
+        { appendBlocks : List Ast.BlockElement -> a -> a
         , value : a
         }
 
 
-append : Ast.BlockElement -> AppendMode a -> AppendMode a
-append block (AppendMode appendable) =
+append : List Ast.BlockElement -> AppendMode a -> AppendMode a
+append blocks (AppendMode appendable) =
     AppendMode
         { appendable
             | value =
-                appendable.appendBlock block appendable.value
+                appendable.appendBlocks blocks appendable.value
         }
 
 
@@ -397,7 +399,7 @@ appendParagraph :
     -> Builder parent (AppendMode a)
 appendParagraph content builder =
     modify
-        (append (Ast.ParagraphBlock content))
+        (append [Ast.ParagraphBlock content])
         builder
 
 
@@ -417,7 +419,7 @@ appendOrderedList builder =
             \(ListBlock_ context) ->
                 modify
                     (append
-                        (Ast.ListBlock
+                        [Ast.ListBlock
                             { ordered = context.ordered
                             , items =
                                 List.reverse context.items
@@ -428,7 +430,7 @@ appendOrderedList builder =
                                             }
                                         )
                             }
-                        )
+                        ]
                     )
                     builder
         , root = childRoot builder
@@ -451,7 +453,7 @@ appendUnorderedList builder =
             \(ListBlock_ context) ->
                 modify
                     (append
-                        (Ast.ListBlock
+                        [Ast.ListBlock
                             { ordered = context.ordered
                             , items =
                                 List.reverse context.items
@@ -462,7 +464,7 @@ appendUnorderedList builder =
                                             }
                                         )
                             }
-                        )
+                        ]
                     )
                     builder
         , root = childRoot builder
@@ -493,7 +495,7 @@ appendCodeBlock :
     -> Builder parent (AppendMode a)
 appendCodeBlock r =
     modify
-        (append (Ast.CodeBlock r))
+        (append [Ast.CodeBlock r])
 
 
 {-| Append a quote block, and focus it.
@@ -505,11 +507,11 @@ appendQuoteBlock builder =
     Builder
         { current =
             AppendMode
-                { appendBlock =
-                    \elem (QuoteBlock context) ->
+                { appendBlocks =
+                    \elems (QuoteBlock context) ->
                         QuoteBlock
                             { context
-                                | content = elem :: context.content
+                                | content = elems ++ context.content
                             }
                 , value =
                     QuoteBlock
@@ -521,9 +523,9 @@ appendQuoteBlock builder =
                 (\(QuoteBlock block) ->
                     modify
                         (append
-                            (Ast.QuoteBlock
+                            [Ast.QuoteBlock
                                 (List.reverse block.content)
-                            )
+                            ]
                         )
                         builder
                 )
@@ -550,3 +552,12 @@ modify f (Builder builder) =
         { builder
             | current = f builder.current
         }
+
+{-| Lower level API to append `BlockElement`.
+-}
+appendBlocks :
+   List Ast.BlockElement
+   -> Builder parent (AppendMode a)
+   -> Builder parent (AppendMode a)
+appendBlocks blocks builder =
+    modify (append blocks) builder
