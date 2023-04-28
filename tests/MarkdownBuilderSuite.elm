@@ -18,7 +18,7 @@ Markdown Builder builds *Markdown* programmatically.
 
 ## Section
 
-* List Item 1
+* List Item **1**
     1. Child item
 * List Item 2
 
@@ -64,12 +64,15 @@ myMarkdown =
         |> MB.editBody
         |> MB.appendUnorderedList
         |> MB.appendListItem
-            [ Ast.PlainText "List Item 1"
+            [ Ast.PlainText "List Item "
+            , Ast.StrongEmphasis "1"
             ]
         |> MB.appendOrderedList
         |> MB.appendListItem
             [ Ast.PlainText "Child item"
             ]
+        |> MB.break
+        |> MB.break
         |> MB.break
         |> MB.appendListItem
             [ Ast.PlainText "List Item 2"

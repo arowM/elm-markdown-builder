@@ -4,7 +4,7 @@
     "format": "elm-format src",
     "start": "elm-doc-preview --port=8110",
     "review": "elm-review --fix",
-    "test": "elm-review && elm-format --validate src && elm-verify-examples -r && elm make --docs=/tmp/docs.json"
+    "test": "elm-review && elm-format --validate src && elm-verify-examples -r && elm-test && elm make --docs=/tmp/docs.json"
   },
   "devDependencies": {
     "@elm-tooling/elm-language-server": "^2.6.0",

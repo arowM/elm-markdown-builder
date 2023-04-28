@@ -96,7 +96,8 @@ You can build a valid markdown structure programmatically in your program:
             |> editBody
             |> appendUnorderedList
             |> appendListItem
-                [ Ast.PlainText "List Item 1"
+                [ Ast.PlainText "List Item "
+                , Ast.StrongEmphasis "1"
                 ]
             |> appendOrderedList
             |> appendListItem
@@ -131,7 +132,7 @@ You can build a valid markdown structure programmatically in your program:
     --> , ""
     --> , "## Builder"
     --> , ""
-    --> , "* List Item 1"
+    --> , "* List Item **1**"
     --> , "    1. Child item"
     --> , "* List Item 2"
     --> , ""
@@ -459,7 +460,7 @@ appendUnorderedList builder =
                                 List.reverse context.items
                                     |> List.map
                                         (\(ListItem item) ->
-                                            { content = List.reverse item.content
+                                            { content = item.content
                                             , children = List.reverse item.children
                                             }
                                         )
