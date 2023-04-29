@@ -562,4 +562,4 @@ appendBlocks :
     -> Builder parent (AppendMode a)
     -> Builder parent (AppendMode a)
 appendBlocks blocks builder =
-    modify (append blocks) builder
+    modify (append <| List.reverse blocks) builder

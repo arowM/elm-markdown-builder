@@ -42,6 +42,11 @@ Markdown Builder builds *Markdown* programmatically.
     >     ...
     > ```
 
+    ```text
+    foo
+    bar
+    ```
+
     ![dummy image](./foo)
 * List Item 4"""
 
@@ -112,12 +117,19 @@ myMarkdown =
                 ...
             """
         |> MB.break
-        |> MB.appendParagraph
-            [ Ast.Image
-              { src = "./foo"
-              , alt = "  dummy  image\n"
-              , title = Nothing
-              }
+        |> MB.appendBlocks
+            [ Ast.CodeBlock
+                """text
+                foo
+                bar
+                """
+            , Ast.ParagraphBlock
+                [ Ast.Image
+                  { src = "./foo"
+                  , alt = "  dummy  image\n"
+                  , title = Nothing
+                  }
+                ]
             ]
         |> MB.break
         |> MB.appendListItem
